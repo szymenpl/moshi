@@ -21,6 +21,7 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.util.Set;
 import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import okio.Buffer;
 import okio.BufferedSink;
@@ -138,6 +139,24 @@ public abstract class JsonAdapter<T> {
       }
       @Override public String toString() {
         return delegate + ".nullSafe()";
+      }
+    };
+  }
+
+  public final JsonAdapter<T> nonNull() {
+    final JsonAdapter<T> delegate = this;
+    return new JsonAdapter<T>() {
+      @Override public @Nonnull T fromJson(JsonReader reader) throws IOException {
+        T value = delegate.fromJson(reader);
+        if (value == null) throw new JsonDataException("value == null");
+        return value;
+      }
+      @Override public void toJson(JsonWriter writer, @Nullable T value) throws IOException {
+        if (value == null) throw new NullPointerException("value == null");
+        delegate.toJson(writer, value);
+      }
+      @Override public String toString() {
+        return delegate + ".nonNull()";
       }
     };
   }

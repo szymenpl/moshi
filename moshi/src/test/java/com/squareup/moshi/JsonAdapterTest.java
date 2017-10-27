@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -181,5 +182,29 @@ public final class JsonAdapterTest {
     JsonWriter writer = factory.newWriter();
     serializeNulls.toJson(writer, Collections.<String, String>singletonMap("a", null));
     assertThat(factory.json()).isEqualTo("{\"a\":null}");
+  }
+
+  @Test public void nonNull() throws Exception {
+    JsonAdapter<String> nonNull = new JsonAdapter<String>() {
+      @Override public String fromJson(JsonReader reader) throws IOException {
+        return reader.nextString();
+      }
+
+      @Override public void toJson(JsonWriter writer, @Nullable String value) throws IOException {
+        writer.value(value);
+      }
+    }.nullSafe().nonNull();
+    try {
+      nonNull.fromJson("null");
+      fail();
+    } catch (JsonDataException expected) {
+      assertThat(expected).hasMessage("value == null");
+    }
+    try {
+      nonNull.toJson(null);
+      fail();
+    } catch (NullPointerException expected) {
+      assertThat(expected).hasMessage("value == null");
+    }
   }
 }
