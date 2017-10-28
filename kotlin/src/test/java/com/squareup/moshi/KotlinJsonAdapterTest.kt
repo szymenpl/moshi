@@ -132,6 +132,19 @@ class KotlinJsonAdapterTest {
     }
   }
 
+  @Test fun nullCannotBeAssignedToNonNullableProperty() {
+    class Data(val data: String)
+    val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    val jsonAdapter = moshi.adapter(Data::class.java)
+
+    try {
+      jsonAdapter.fromJson("{\"data\":null}")
+      fail()
+    } catch (expected: JsonDataException) {
+      assertThat(expected).hasMessage("value == null")
+    }
+  }
+
   class RequiredValueAbsent(var a: Int = 3, var b: Int)
 
   @Test fun duplicatedValue() {
