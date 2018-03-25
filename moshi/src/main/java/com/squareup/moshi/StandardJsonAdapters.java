@@ -18,6 +18,8 @@ package com.squareup.moshi;
 import com.squareup.moshi.internal.Util;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
@@ -53,6 +55,12 @@ final class StandardJsonAdapters {
       if (type == Object.class) return new ObjectJsonAdapter(moshi).nullSafe();
 
       Class<?> rawType = Types.getRawType(type);
+
+      JsonClass jsonClass = rawType.getAnnotation(JsonClass.class);
+      if (jsonClass != null && jsonClass.generateAdapter()) {
+        return generatedAdapter(moshi, type, rawType);
+      }
+
       if (rawType.isEnum()) {
         //noinspection unchecked
         return new EnumJsonAdapter<>((Class<? extends Enum>) rawType).nullSafe();
@@ -214,6 +222,31 @@ final class StandardJsonAdapters {
       return "JsonAdapter(String)";
     }
   };
+
+  /**
+   * Loads the generated JsonAdapter for classes annotated {@link JsonClass}. This works because it
+   * uses the same naming conventions as {@code JsonClassCodeGenProcessor}.
+   */
+  static JsonAdapter<?> generatedAdapter(Moshi moshi, Type type, Class<?> rawType) {
+    String adapterClassName = rawType.getName().replace("$", "_") + "JsonAdapter";
+    try {
+      @SuppressWarnings("unchecked") // We generate types to match.
+      Class<? extends JsonAdapter<?>> adapterClass = (Class<? extends JsonAdapter<?>>)
+          Class.forName(adapterClassName, true, rawType.getClassLoader());
+      if (type instanceof ParameterizedType) {
+        return adapterClass.getDeclaredConstructor(Moshi.class, Type[].class)
+            .newInstance(moshi, ((ParameterizedType) type).getActualTypeArguments());
+      } else {
+        return adapterClass.getDeclaredConstructor(Moshi.class).newInstance(moshi);
+      }
+    } catch (ClassNotFoundException | NoSuchMethodException e) {
+      throw new RuntimeException(
+          "Failed to find the generated the JsonAdapter for " + rawType, e);
+    } catch (IllegalAccessException | InvocationTargetException | InstantiationException e) {
+      throw new RuntimeException(
+          "Failed to create the generated JsonAdapter for " + rawType, e);
+    }
+  }
 
   static final class EnumJsonAdapter<T extends Enum<T>> extends JsonAdapter<T> {
     private final Class<T> enumType;
